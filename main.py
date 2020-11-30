@@ -1,0 +1,26 @@
+import sys
+
+
+if __name__ == '__main__':
+    if len(sys.argv) >= 2:
+        filename = sys.argv[1]
+        print("Reading input from file: {} ...".format(filename))
+        try:
+            with open(filename, 'r') as f:
+                lines = f.readlines()
+                for line in f:
+                    # process line
+                    print(line)
+        except IOError:
+            print("ERROR: Cannot open file {}".format(filename))
+    else:
+        print("Reading input from standard input...")
+        print('You can quit the program by typing "QUIT"...')
+        while True:
+            line = input()
+            if line.strip() == 'QUIT':
+                print("Exiting...")
+                break
+            # process line
+            print(line)
+
