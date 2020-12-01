@@ -86,17 +86,21 @@ class CommitValue:
 
 
 class Variable:
-    def __init__(self, var_id, value):
+    def __init__(self, var_id, value, replicated):
         """
         var_id (str)
         value (int)
         commit_val (CommitValue)
         temp_val (int)
+        replicated (bool)
+        available (bool): a var is unavailable after recover from failure until a write commited
         """
         self.var_id = var_id
         self.commit_val = [CommitValue(value, 0)]
         self.temp_val = value
+        self.replicated = replicated
         self.lock_manager = LockManager()
+        self.available = True
 
 
 class DataManager:
@@ -104,14 +108,19 @@ class DataManager:
         """
         site_id (int)
         variable_table (dict -- x1 (str) : Variable(x1))
+        visited_transaction (set of trans_id): transactions who visited this site 
         """
         self.site_id = site_id
         self.variable_table = {}
+        self.is_working = True
+        self.visited_transaction = set()
 
         for i in range(1, 21):
             var_idx = "x" + str(i)
-            if i % 2 == 0 or i % 10 + 1 == site_id:
-                self.variable_table[var_idx] = Variable(var_idx, 10 * i)
+            if i % 2 == 0:
+                self.variable_table[var_idx] = Variable(var_idx, 10 * i, True)
+            if i % 10 + 1 == site_id:
+                self.variable_table[var_idx] = Variable(var_idx, 10 * i, False)
 
 
     def read_snapshot(self, timestamp: int, var_id):
@@ -142,7 +151,11 @@ class DataManager:
         """
         if not self.variable_table.get(var_id):
             return False, None
-        var: Variable = self.variable_table[var_id]
+        var: Variable = self.variable_table[var_id]        
+        # if the var hasn't been visited after the site recovery
+        if not var.available:
+            return False, None
+
         if not var.lock_manager.current_lock:
             var.lock_manager.change_current_lock(ReadLockItem(var_id, "R", trans_id))
             return True, var.commit_val[-1].value
@@ -162,7 +175,7 @@ class DataManager:
         elif var.lock_manager.current_lock.trans_id == trans_id:
             return True, var.temp_val
         
-        # is being wrote by other transaction, add to queue
+        # is being written by other transaction, add to queue
         var.lock_manager.add_lock_to_queue(ReadLockItem(var_id, "R", trans_id))
         return False, None
 
@@ -206,3 +219,22 @@ class DataManager:
             return
         self.variable_table[var_id].temp_val = value
 
+
+    def fail(self):
+        """
+        fail a site, wipe out all the lock information of it
+        """
+        self.is_working = False
+        for var in self.variable_table.values():
+            var.lock_manager.current_lock = None
+            var.lock_manager.lock_queue = []
+            if var.replicated:
+                var.available = False
+
+
+    def recover(self):
+        """
+        recover a site
+        """
+        self.is_working = True
+        self.visited_transaction = set()

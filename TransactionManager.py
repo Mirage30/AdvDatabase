@@ -34,6 +34,8 @@ class Transaction:
         self.trans_id = trans_id
         self.timestamp = timestamp
         self.read_only = read_only
+        self.aborted = False
+        self.commited = False
 
 
 class Operation:
@@ -58,6 +60,7 @@ class TransactionManager:
         self.timestamp = 0
         self.operation_queue = [] # queue of Operation
         self.data_manager_list = [] # list of DataManager
+        
         for i in range(1, 11):
             self.data_manager_list.append(DataManager(i))
 
@@ -112,14 +115,21 @@ class TransactionManager:
                     self.operation_queue.remove(ope)
 
 
+    def ensure_transaction_exists(self, trans_id):
+        """
+        return whether the trans_id(str) exists in the trans table
+        """
+        if not self.transaction_table.get(trans_id):
+            raise InvalidInputError("ERROR: Transaction {} does not exist".format(trans_id))
+
+
     def add_read(self, trans_id, var_id):
         """ 
         Add a read operation to operation queue
         trans_id (str)
         var_id (str)
         """
-        if not self.transaction_table.get(trans_id):
-            raise InvalidInputError("ERROR: Transaction {} does not exist".format(trans_id))
+        self.ensure_transaction_exists(trans_id)
         self.operation_queue.append(Operation("R", trans_id, var_id))
 
 
@@ -130,8 +140,7 @@ class TransactionManager:
         var_id (str)
         value (str)
         """
-        if not self.transaction_table.get(trans_id):
-            raise InvalidInputError("ERROR: Transaction {} does not exist".format(trans_id))
+        self.ensure_transaction_exists(trans_id)
         self.operation_queue.append(Operation("W", trans_id, var_id, int(value)))
 
 
@@ -150,68 +159,91 @@ class TransactionManager:
             print("Read-only transaction {} begins".format(trans_id))
 
 
-    def read(self, operation : Operation):
+    def read(self, operation: Operation):
         """ 
         Read a variable
         operation (Operation)
         Return : (bool) whether read successfully
         """
-        if not self.transaction_table.get(operation.trans_id):
-            raise InvalidInputError("ERROR: Transaction {} does not exist".format(operation.trans_id))
+        self.ensure_transaction_exists(operation.trans_id)
         for dm in self.data_manager_list:
-            res, val = False, 0
-            if self.transaction_table[operation.trans_id].read_only:
-                res, val = dm.read_snapshot(self.transaction_table[operation.trans_id].timestamp, operation.var_id)
-            else:
-                res, val = dm.read(operation.trans_id, operation.var_id)
-            if res:
-                print("Transaction {} read from site {} ==> Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
-                return True
+            if dm.is_working:
+                res, val = False, 0
+                if self.transaction_table[operation.trans_id].read_only:
+                    res, val = dm.read_snapshot(self.transaction_table[operation.trans_id].timestamp, operation.var_id)
+                    if res:
+                        print("Read- only transaction {} read from site {} ==> Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
+                        return True
+                else:
+                    res, val = dm.read(operation.trans_id, operation.var_id)
+                    if res:
+                        # record the trans_id in case the site fails and the trans_id need to be aborted
+                        dm.visited_transaction.add(operation.trans_id) 
+                        print("Transaction {} read from site {} ==> Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
+                        return True
         return False
 
 
-    def write(self, operation : Operation):
+    def write(self, operation: Operation):
         """ 
         Write a variable
         operation (Operation)
         Return : (bool) whether write successfully
         """
-        if not self.transaction_table.get(operation.trans_id):
-            raise InvalidInputError("ERROR: Transaction {} does not exist".format(operation.trans_id))
+        self.ensure_transaction_exists(operation.trans_id)
         for dm in self.data_manager_list:
-            if not dm.check_write(operation.trans_id, operation.var_id):
+            if dm.is_working and not dm.check_write(operation.trans_id, operation.var_id):
                 return False
         
         for dm in self.data_manager_list:
-            dm.write(operation.trans_id, operation.var_id, operation.value)
+            if dm.is_working:
+                dm.write(operation.trans_id, operation.var_id, operation.value)
+                # record the trans_id in case the site fails and the trans_id need to be aborted
+                dm.visited_transaction.add(operation.trans_id)
         print("Transaction {} write value {} to {}".format(operation.trans_id, operation.value, operation.var_id))
         return True
 
 
     def dump(self):
         """ 
-        begin a transaction with id trans_id
+        gives the commited values of all copies of all variables at all sites
+        sorted per site with all values in ascending order by variable name
         """
         print("dump")
 
 
     def end(self, trans_id):
         """ 
-        begin a transaction with id trans_id
+        end transaction trans_id
+        trans_id (str)
         """
-        print("end")
+        self.ensure_transaction_exists(trans_id)
 
 
-    def fail(self, site_id):
+    def fail(self, site_id: int):
         """ 
-        begin a transaction with id trans_id
+        site with id stie_id (int) fails
         """
-        print("fail")
+        if site_id < 1 or site_id > 10:
+            raise InvalidInputError("ERROR: site {} does not exist".format(site_id))
+        if not self.data_manager_list[site_id].is_working:
+            raise InvalidInputError("ERROR: site {} already fails".format(site_id))
+        dm: DataManager = self.data_manager_list[site_id]
+        dm.fail()
+        # if a transaction visited this site and haven't commited yet, abort it
+        for trans_id in dm.visited_transaction:
+            if not self.transaction_table[trans_id].commited:
+                self.transaction_table[trans_id].aborted = True
 
 
-    def recover(self, site_id):
+    def recover(self, site_id: int):
         """ 
-        begin a transaction with id trans_id
+        recover site
         """
-        print("recover")
+        if site_id < 1 or site_id > 10:
+            raise InvalidInputError("ERROR: site {} does not exist".format(site_id))
+        if self.data_manager_list[site_id].is_working:
+            raise InvalidInputError("ERROR: site {} already works".format(site_id))
+        dm: DataManager = self.data_manager_list[site_id]
+        dm.recover()
 
