@@ -93,7 +93,7 @@ class TransactionManager:
 
             self.timestamp += 1
             self.execute()
-
+            
 
     def execute(self):
         """
@@ -110,7 +110,6 @@ class TransactionManager:
                     res = self.write(ope)
                 if res:
                     self.operation_queue.remove(ope)
-
 
 
     def add_read(self, trans_id, var_id):
@@ -155,19 +154,24 @@ class TransactionManager:
         """ 
         Read a variable
         operation (Operation)
+        Return : (bool) whether read successfully
         """
         if not self.transaction_table.get(operation.trans_id):
             raise InvalidInputError("Transaction {} does not exist".format(operation.trans_id))
         for dm in self.data_manager_list:
-            # dm.read(operation.trans_id, operation.var_id)
+            res, val = dm.read(operation.trans_id, operation.var_id)
+            if res:
+                print("{} successfully read from site {}. Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
+                return True
+        return False
 
-        print("read")
-        return True
 
 
     def write(self, operation):
         """ 
-        begin a transaction with id trans_id
+        Write a variable
+        operation (Operation)
+        Return : (bool) whether write successfully
         """
         print("write")
         return True

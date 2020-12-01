@@ -27,3 +27,7 @@ if __name__ == '__main__':
             trans_manager.get_command(line)
             # print(line)
 
+
+# class test:
+#     def __init__(self, x):
+#         self.x = x
