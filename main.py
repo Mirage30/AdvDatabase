@@ -10,6 +10,7 @@ if __name__ == '__main__':
                 lines = f.readlines()
                 for line in f:
                     # process line
+
                     print(line)
         except IOError:
             print("ERROR: Cannot open file {}".format(filename))
