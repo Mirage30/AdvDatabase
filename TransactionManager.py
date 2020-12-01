@@ -8,7 +8,7 @@ class Parser:
         """
         Translate an input line (str) into command
         """ 
-        if done_flag:
+        if self.done_flag:
             return None
         line = line.split('//')[0].strip()
         if line:
@@ -54,7 +54,7 @@ class TransactionManager:
     def __init__(self):
         self.transaction_table = {}
         self.timestamp = 0
-        self.operation_queue = []
+        self.operation_queue = [] # queue of Operation
 
 
     def get_command(self, line):
@@ -62,33 +62,59 @@ class TransactionManager:
         process a line of command
         line: A single line of command
         """
-        args = self.parser.translate(line)
+        args = self.parser.translate(line) # command and args or None
         if args:
             command = args.pop(0)
             if command == "begin":
-                begin(args[0], False)
+                self.begin(args[0], False)
             elif command == "beginRO":
-                begin(args[0], True)
+                self.begin(args[0], True)
             elif command == "R":
-                add_read(args[0], args[1])
+                self.add_read(args[0], args[1])
             elif command == "W":
-                add_write(args[0], args[1], args[2])
+                self.add_write(args[0], args[1], args[2])
             elif command == "dump":
-                dump()
+                self.dump()
             elif command == "end":
-                end(args[0])
+                self.end(args[0])
             elif command == "fail":
-                fail(int(args[0]))
+                self.fail(int(args[0]))
             elif command == "recover":
-                recover(int(args[0]))
+                self.recover(int(args[0]))
             else:
                 raise InvalidInputError("ERROR: Invalid Input: {}".format(command))
+            print(line)
+            print(self.transaction_table)
+            print(self.operation_queue)
+
+            self.timestamp += 1
+            self.execute()
+
+
+    def execute(self):
+        """
+        Go through the operation queue, execute those could be run
+        """
+        for ope in list(self.operation_queue):
+            if not self.transaction_table.get(ope.trans_id):
+                self.operation_queue.remove(ope)
+            else:
+                res = False
+                if ope.operation_type == 'R':
+                    res = self.read(ope)
+                elif ope.operation_type == 'W':
+                    res = self.write(ope)
+                if res:
+                    self.operation_queue.remove(ope)
+
 
 
     def add_read(self, trans_id, var_id):
         """ 
         Add a read operation to operation queue
         """
+        if not self.transaction_table.get(trans_id):
+            raise InvalidInputError("Transaction {} does not exist".format(trans_id))
         self.operation_queue.append(Operation("R", trans_id, var_id))
 
 
@@ -96,6 +122,8 @@ class TransactionManager:
         """ 
         Add a write operation to operation queue
         """
+        if not self.transaction_table.get(trans_id):
+            raise InvalidInputError("Transaction {} does not exist".format(trans_id))
         self.operation_queue.append(Operation("W", trans_id, var_id, value))
 
 
@@ -114,26 +142,44 @@ class TransactionManager:
             print("Read-only transaction {} begins".format(trans_id))
 
 
+    def read(self, operation):
+        """ 
+        begin a transaction with id trans_id
+        """
+        print("dump")
+
+
+    def write(self, operation):
+        """ 
+        begin a transaction with id trans_id
+        """
+        print("dump")
+
+
     def dump(self):
         """ 
         begin a transaction with id trans_id
         """
+        print("dump")
 
 
     def end(self, trans_id):
         """ 
         begin a transaction with id trans_id
         """
+        print("end")
 
 
     def fail(self, site_id):
         """ 
         begin a transaction with id trans_id
         """
+        print("fail")
 
 
     def recover(self, site_id):
         """ 
         begin a transaction with id trans_id
         """
+        print("recover")
 

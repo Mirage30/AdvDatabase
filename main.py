@@ -1,17 +1,19 @@
 import sys
+from TransactionManager import TransactionManager
 
 
 if __name__ == '__main__':
+    trans_manager = TransactionManager()
+
     if len(sys.argv) >= 2:
         filename = sys.argv[1]
         print("Reading input from file: {} ...".format(filename))
         try:
             with open(filename, 'r') as f:
                 lines = f.readlines()
-                for line in f:
-                    # process line
-
-                    print(line)
+                for line in lines:
+                    # print(line)
+                    trans_manager.get_command(line)
         except IOError:
             print("ERROR: Cannot open file {}".format(filename))
     else:
@@ -22,6 +24,6 @@ if __name__ == '__main__':
             if line.strip() == 'QUIT':
                 print("Exiting...")
                 break
-            # process line
-            print(line)
+            trans_manager.get_command(line)
+            # print(line)
 
