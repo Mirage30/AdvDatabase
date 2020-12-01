@@ -1,4 +1,5 @@
 import re
+from DataManager import DataManager
 
 
 class Parser:
@@ -41,7 +42,7 @@ class Operation:
         operation_type (str): "R" or "W"
         trans_id (str)
         var_id (str)
-        value (int)
+        value (str)
         """
         self.operation_type = operation_type
         self.trans_id = trans_id
@@ -51,10 +52,14 @@ class Operation:
 
 class TransactionManager:
     parser = Parser()
+
     def __init__(self):
         self.transaction_table = {}
         self.timestamp = 0
         self.operation_queue = [] # queue of Operation
+        self.data_manager_list = [] # list of DataManager
+        for i in range(1, 11):
+            self.data_manager_list.append(DataManager(i))
 
 
     def get_command(self, line):
@@ -64,6 +69,8 @@ class TransactionManager:
         """
         args = self.parser.translate(line) # command and args or None
         if args:
+            print("raw line : " + line.strip())
+
             command = args.pop(0)
             if command == "begin":
                 self.begin(args[0], False)
@@ -83,9 +90,6 @@ class TransactionManager:
                 self.recover(int(args[0]))
             else:
                 raise InvalidInputError("ERROR: Invalid Input: {}".format(command))
-            print(line)
-            print(self.transaction_table)
-            print(self.operation_queue)
 
             self.timestamp += 1
             self.execute()
@@ -112,6 +116,8 @@ class TransactionManager:
     def add_read(self, trans_id, var_id):
         """ 
         Add a read operation to operation queue
+        trans_id (str)
+        var_id (str)
         """
         if not self.transaction_table.get(trans_id):
             raise InvalidInputError("Transaction {} does not exist".format(trans_id))
@@ -121,6 +127,9 @@ class TransactionManager:
     def add_write(self, trans_id, var_id, value):
         """ 
         Add a write operation to operation queue
+        trans_id (str)
+        var_id (str)
+        value (str)
         """
         if not self.transaction_table.get(trans_id):
             raise InvalidInputError("Transaction {} does not exist".format(trans_id))
@@ -129,7 +138,7 @@ class TransactionManager:
 
     def begin(self, trans_id, read_only):
         """ 
-        begin a transaction with id trans_id
+        Begin a transaction with id trans_id
         trans_id (str)
         read_only (bool)
         """
@@ -144,16 +153,24 @@ class TransactionManager:
 
     def read(self, operation):
         """ 
-        begin a transaction with id trans_id
+        Read a variable
+        operation (Operation)
         """
-        print("dump")
+        if not self.transaction_table.get(operation.trans_id):
+            raise InvalidInputError("Transaction {} does not exist".format(operation.trans_id))
+        for dm in self.data_manager_list:
+            # dm.read(operation.trans_id, operation.var_id)
+
+        print("read")
+        return True
 
 
     def write(self, operation):
         """ 
         begin a transaction with id trans_id
         """
-        print("dump")
+        print("write")
+        return True
 
 
     def dump(self):
