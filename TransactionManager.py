@@ -42,7 +42,7 @@ class Operation:
         operation_type (str): "R" or "W"
         trans_id (str)
         var_id (str)
-        value (str)
+        value (int)
         """
         self.operation_type = operation_type
         self.trans_id = trans_id
@@ -119,7 +119,7 @@ class TransactionManager:
         var_id (str)
         """
         if not self.transaction_table.get(trans_id):
-            raise InvalidInputError("Transaction {} does not exist".format(trans_id))
+            raise InvalidInputError("ERROR: Transaction {} does not exist".format(trans_id))
         self.operation_queue.append(Operation("R", trans_id, var_id))
 
 
@@ -131,8 +131,8 @@ class TransactionManager:
         value (str)
         """
         if not self.transaction_table.get(trans_id):
-            raise InvalidInputError("Transaction {} does not exist".format(trans_id))
-        self.operation_queue.append(Operation("W", trans_id, var_id, value))
+            raise InvalidInputError("ERROR: Transaction {} does not exist".format(trans_id))
+        self.operation_queue.append(Operation("W", trans_id, var_id, int(value)))
 
 
     def begin(self, trans_id, read_only):
@@ -142,7 +142,7 @@ class TransactionManager:
         read_only (bool)
         """
         if self.transaction_table.get(trans_id):
-            raise InvalidInputError("ERROR: The transaction {} already exists".format(trans_id))
+            raise InvalidInputError("ERROR: Transaction {} already exists".format(trans_id))
         self.transaction_table[trans_id] = Transaction(trans_id, self.timestamp, read_only)
         if not read_only:
             print("Transaction {} begins".format(trans_id))
@@ -150,30 +150,41 @@ class TransactionManager:
             print("Read-only transaction {} begins".format(trans_id))
 
 
-    def read(self, operation):
+    def read(self, operation : Operation):
         """ 
         Read a variable
         operation (Operation)
         Return : (bool) whether read successfully
         """
         if not self.transaction_table.get(operation.trans_id):
-            raise InvalidInputError("Transaction {} does not exist".format(operation.trans_id))
+            raise InvalidInputError("ERROR: Transaction {} does not exist".format(operation.trans_id))
         for dm in self.data_manager_list:
-            res, val = dm.read(operation.trans_id, operation.var_id)
+            res, val = False, 0
+            if self.transaction_table[operation.trans_id].read_only:
+                res, val = dm.read_snapshot(self.transaction_table[operation.trans_id].timestamp, operation.var_id)
+            else:
+                res, val = dm.read(operation.trans_id, operation.var_id)
             if res:
-                print("{} successfully read from site {}. Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
+                print("Transaction {} read from site {} ==> Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
                 return True
         return False
 
 
-
-    def write(self, operation):
+    def write(self, operation : Operation):
         """ 
         Write a variable
         operation (Operation)
         Return : (bool) whether write successfully
         """
-        print("write")
+        if not self.transaction_table.get(operation.trans_id):
+            raise InvalidInputError("ERROR: Transaction {} does not exist".format(operation.trans_id))
+        for dm in self.data_manager_list:
+            if not dm.check_write(operation.trans_id, operation.var_id):
+                return False
+        
+        for dm in self.data_manager_list:
+            dm.write(operation.trans_id, operation.var_id, operation.value)
+        print("Transaction {} write value {} to {}".format(operation.trans_id, operation.value, operation.var_id))
         return True
 
 
