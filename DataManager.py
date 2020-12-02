@@ -1,3 +1,6 @@
+from ErrorHandler import InvalidInputError
+
+
 class LockItem:
     def __init__(self, var_id, lock_type, trans_id):
         """
@@ -73,6 +76,20 @@ class LockManager:
         assert(self.current_lock.lock_type == "R" and lock.lock_type == "W")
         assert(len(self.current_lock.share_list) == 1 and lock.trans_id in self.current_lock.share_list)
         self.current_lock = lock
+
+
+    def release_current_lock(self, trans_id):
+        """
+        check whether trans_id hold the current lock
+        if so, release it
+        """
+        if self.current_lock:
+            if self.current_lock.lock_type == "R" and trans_id in self.current_lock.share_list:
+                self.current_lock.share_list.remove(trans_id)
+                if not len(self.current_lock.share_list):
+                    self.current_lock = None
+            elif self.current_lock.lock_type == "W" and trans_id == self.current_lock.trans_id:
+                self.current_lock = None    
 
 
 class CommitValue:
@@ -218,6 +235,45 @@ class DataManager:
         if not self.variable_table.get(var_id):
             return
         self.variable_table[var_id].temp_val = value
+
+
+    def dump(self):
+        """
+        gives the commited values of all copies of all variables at all sites
+        sorted per site with all values in ascending order by variable name
+        """
+        updown = "UP" if self.is_working else "DOWN"
+        res = "[{}]Site {} ".format(updown, self.site_id)
+        for var in self.variable_table.values():
+            res += "-- {}: {} ".format(var.var_id, var.commit_val[-1].value)
+        print(res)
+
+
+    def abort(self, trans_id):
+        """
+        abort a transaction
+        """
+        for var in self.variable_table.values():
+            lm: LockManager = var.lock_manager
+            lm.release_current_lock(trans_id)
+            for lk in list(lm.lock_queue):
+                if lk.trans_id == trans_id:
+                    lm.lock_queue.remove(lk)
+
+
+    def commit(self, trans_id, timestamp):
+        """
+        commit a transaction
+        """
+        for var in self.variable_table.values():
+            lm: LockManager = var.lock_manager
+            if lm.current_lock and lm.current_lock.lock_type == "W" and lm.current_lock.trans_id == trans_id:
+                var.commit_val.append(CommitValue(var.temp_val, timestamp))
+                var.available = True
+            lm.release_current_lock(trans_id)
+            for lk in list(lm.lock_queue):
+                if lk.trans_id == trans_id:
+                    raise InvalidInputError("ERROR: transaction {} commits before all operations done".format(trans_id))
 
 
     def fail(self):

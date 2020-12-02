@@ -1,5 +1,6 @@
 import re
 from DataManager import DataManager
+from ErrorHandler import InvalidInputError
 
 
 class Parser:
@@ -19,22 +20,20 @@ class Parser:
             return re.findall(r"[\w]+", line)
 
 
-class InvalidInputError(Exception):
-    def __init__(self, message):
-        self.message = message
-
-
 class Transaction:
     def __init__(self, trans_id, timestamp, read_only):
         """
         trans_id (str)
         timestamp (int)
         read_only (bool)
+        aborted (bool)
+        abort_reason (str)
         """
         self.trans_id = trans_id
         self.timestamp = timestamp
         self.read_only = read_only
         self.aborted = False
+        self.abort_reason = None
 
 
 class Operation:
@@ -100,6 +99,7 @@ class TransactionManager:
     def execute(self):
         """
         Go through the operation queue, execute those could be run
+        If a transaction does not exists, remove it from the operation queue
         """
         for ope in list(self.operation_queue):
             if not self.transaction_table.get(ope.trans_id):
@@ -208,7 +208,9 @@ class TransactionManager:
         gives the commited values of all copies of all variables at all sites
         sorted per site with all values in ascending order by variable name
         """
-        print("dump")
+        print("Dumping...")
+        for dm in self.data_manager_list:
+            dm.dump()
 
 
     def end(self, trans_id):
@@ -218,23 +220,29 @@ class TransactionManager:
         """
         self.ensure_transaction_exists(trans_id)
         if self.transaction_table[trans_id].aborted:
-            self.abort()
+            self.abort(trans_id)
         else:
-            self.commit()
+            self.commit(trans_id)
 
 
-    def abort(self):
+    def abort(self, trans_id):
         """
         abort a transaction
         """
-        print("abort!")
+        for dm in self.data_manager_list:
+            dm.abort(trans_id)
+        print("Transaction {} is aborted because of {}".format(trans_id, self.transaction_table[trans_id].abort_reason))
+        self.transaction_table.pop(trans_id)
 
 
-    def commit(self):
+    def commit(self, trans_id):
         """
         commit a transaction
         """
-        print("commit!")
+        for dm in self.data_manager_list:
+            dm.commit(trans_id, self.timestamp)
+        self.transaction_table.pop(trans_id)
+        print("Transaction {} commits at time {}".format(trans_id, self.timestamp))
 
 
     def fail(self, site_id: int):
@@ -252,6 +260,7 @@ class TransactionManager:
         for trans_id in dm.visited_transaction:
             if self.transaction_table.get(trans_id):
                 self.transaction_table[trans_id].aborted = True
+                self.transaction_table[trans_id].abort_reason = "site failure"
 
 
     def recover(self, site_id: int):
