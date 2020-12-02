@@ -273,3 +273,12 @@ class TransactionManager:
                 for node,adj_list in graph.items():
                     lock_graph[node].update(adj_list)
         
+def dfs(cur,root,visited,graph):
+    visited.add(cur)
+    for neighbour in graph[cur]:
+        if neighbour == root:
+            return True
+        if neighbour not in visited:
+            if dfs(neighbour,root,visited,graph):
+                return True
+    return False
