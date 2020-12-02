@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 class LockItem:
     def __init__(self, var_id, lock_type, trans_id):
         """
@@ -238,3 +240,30 @@ class DataManager:
         """
         self.is_working = True
         self.visited_transaction = set()
+
+    def generate_graph(self):
+
+        def cur_blocks(cur_lock, lock_in_queue):
+            if cur_lock == "R":
+                if lock_in_queue.lock_type == "R" or \
+                    (len(cur_lock.share_list) == 1 and
+                    lock_in_queue.trans_id in cur_lock.share_list):
+                    return False
+                return True
+            return lm.current_lock.trans_id != lock_in_queue.trans_id
+
+        graph = defaultdict(set)
+        for var_idx, var in self.variable_table.items():
+            lm = var.lock_manager
+            if not lm.current_lock or not lm.lock_queue:
+                continue
+            for lock_in_queue in lm.queue:
+                cur_lock = lm.current_lock
+                if cur_blocks(cur_lock, lock_in_queue):
+                    if cur_lock.lock_type == "R":
+                        for trans_id in cur_lock.share_list:
+                            if trans_id != lock_in_queue.trans_id:
+                                graph[lock_in_queue.trans_id].add(trans_id)
+
+
+
