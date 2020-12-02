@@ -35,7 +35,6 @@ class Transaction:
         self.timestamp = timestamp
         self.read_only = read_only
         self.aborted = False
-        self.commited = False
 
 
 class Operation:
@@ -172,13 +171,13 @@ class TransactionManager:
                 if self.transaction_table[operation.trans_id].read_only:
                     res, val = dm.read_snapshot(self.transaction_table[operation.trans_id].timestamp, operation.var_id)
                     if res:
-                        print("Read- only transaction {} read from site {} ==> Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
+                        print("Read-only transaction {} read from site {} ==> Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
                         return True
                 else:
                     res, val = dm.read(operation.trans_id, operation.var_id)
                     if res:
                         # record the trans_id in case the site fails and the trans_id need to be aborted
-                        dm.visited_transaction.add(operation.trans_id) 
+                        dm.visited_transaction.add(operation.trans_id)
                         print("Transaction {} read from site {} ==> Result: {}: {}".format(operation.trans_id, dm.site_id, operation.var_id, val))
                         return True
         return False
@@ -218,6 +217,24 @@ class TransactionManager:
         trans_id (str)
         """
         self.ensure_transaction_exists(trans_id)
+        if self.transaction_table[trans_id].aborted:
+            self.abort()
+        else:
+            self.commit()
+
+
+    def abort(self):
+        """
+        abort a transaction
+        """
+        print("abort!")
+
+
+    def commit(self):
+        """
+        commit a transaction
+        """
+        print("commit!")
 
 
     def fail(self, site_id: int):
@@ -226,13 +243,14 @@ class TransactionManager:
         """
         if site_id < 1 or site_id > 10:
             raise InvalidInputError("ERROR: site {} does not exist".format(site_id))
-        if not self.data_manager_list[site_id].is_working:
+        if not self.data_manager_list[site_id - 1].is_working:
             raise InvalidInputError("ERROR: site {} already fails".format(site_id))
-        dm: DataManager = self.data_manager_list[site_id]
+        dm: DataManager = self.data_manager_list[site_id - 1]
         dm.fail()
         # if a transaction visited this site and haven't commited yet, abort it
+
         for trans_id in dm.visited_transaction:
-            if not self.transaction_table[trans_id].commited:
+            if self.transaction_table.get(trans_id):
                 self.transaction_table[trans_id].aborted = True
 
 
@@ -242,8 +260,8 @@ class TransactionManager:
         """
         if site_id < 1 or site_id > 10:
             raise InvalidInputError("ERROR: site {} does not exist".format(site_id))
-        if self.data_manager_list[site_id].is_working:
+        if self.data_manager_list[site_id - 1].is_working:
             raise InvalidInputError("ERROR: site {} already works".format(site_id))
-        dm: DataManager = self.data_manager_list[site_id]
+        dm: DataManager = self.data_manager_list[site_id - 1]
         dm.recover()
 
