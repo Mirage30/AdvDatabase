@@ -259,6 +259,7 @@ class DataManager:
             for lk in list(lm.lock_queue):
                 if lk.trans_id == trans_id:
                     lm.lock_queue.remove(lk)
+            # print("xxxx {}".format(len(lm.lock_queue)))
 
 
     def commit(self, trans_id, timestamp):
@@ -271,8 +272,11 @@ class DataManager:
                 var.commit_val.append(CommitValue(var.temp_val, timestamp))
                 var.available = True
             lm.release_current_lock(trans_id)
+            
             for lk in list(lm.lock_queue):
                 if lk.trans_id == trans_id:
+                    # print(self.site_id)
+                    # print(var.var_id)
                     raise InvalidInputError("ERROR: transaction {} commits before all operations done".format(trans_id))
 
 
@@ -317,7 +321,7 @@ class DataManager:
             lm = var.lock_manager
             if not lm.current_lock or not lm.lock_queue:
                 continue
-            for lock_in_queue in lm.queue:
+            for lock_in_queue in lm.lock_queue:
                 cur_lock = lm.current_lock
                 if cur_blocks(cur_lock, lock_in_queue):
                     if cur_lock.lock_type == "R":
@@ -328,15 +332,13 @@ class DataManager:
                         if cur_lock.trans_id == lock_in_queue:
                             continue
                         else:
-                            graph[lock_in_queue.trans_id].add(
-                                cur_lock.trans_id)
+                            graph[lock_in_queue.trans_id].add(cur_lock.trans_id)
         
-            for i in range(len(lm.queue)):
-                lock_queue = lm.queue
+            for i in range(len(lm.lock_queue)):
+                lock_queue = lm.lock_queue
                 for j in range(i):
                     if(queue_blocks(lock_queue[j],lock_queue[i])):
-                        graph[lock_queue[i].trans_id].add(lock_queue[j]
-                        .trans_id)
+                        graph[lock_queue[i].trans_id].add(lock_queue[j].trans_id)
         return graph
 
             

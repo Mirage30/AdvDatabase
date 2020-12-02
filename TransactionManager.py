@@ -94,6 +94,8 @@ class TransactionManager:
 
             self.timestamp += 1
             self.execute()
+            if self.deadlock_detect():
+                self.execute()
             
 
     def execute(self):
@@ -112,7 +114,8 @@ class TransactionManager:
                     res = self.write(ope)
                 if res:
                     self.operation_queue.remove(ope)
-
+        
+        # print("hhh {}".format(len(self.data_manager_list[0].variable_table['x2'].lock_manager.lock_queue)))
 
     def ensure_transaction_exists(self, trans_id):
         """
@@ -278,7 +281,7 @@ class TransactionManager:
         lock_graph = defaultdict(set)
         for data_manager in self.data_manager_list:
             if data_manager.is_working:
-                graph = data_manager.generate()
+                graph = data_manager.generate_graph()
                 for node,adj_list in graph.items():
                     lock_graph[node].update(adj_list)
         abort_trans_id = None
@@ -286,11 +289,12 @@ class TransactionManager:
         for node in list(lock_graph.keys()):
             visited = set()
             if dfs(node,node,visited,lock_graph):
-                if self.transaction_table[node].ts > earliest_ts:
+                if self.transaction_table[node].timestamp > earliest_ts:
                     abort_trans_id = node
-                    earliest_ts = self.transaction_table[node].ts
+                    earliest_ts = self.transaction_table[node].timestamp
         if abort_trans_id:
             print("Deadlock exists: transaction {} is aborted".format(abort_trans_id))
+            self.transaction_table[abort_trans_id].abort_reason = "deadlock"
             self.abort(abort_trans_id)
             return True
         return False
