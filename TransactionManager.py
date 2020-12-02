@@ -281,6 +281,19 @@ class TransactionManager:
                 graph = data_manager.generate()
                 for node,adj_list in graph.items():
                     lock_graph[node].update(adj_list)
+        abort_trans_id = None
+        earliest_ts = -10000
+        for node in list(lock_graph.keys()):
+            visited = set()
+            if dfs(node,node,visited,lock_graph):
+                if self.transaction_table[node].ts > earliest_ts:
+                    abort_trans_id = node
+                    earliest_ts = self.transaction_table[node].ts
+        if abort_trans_id:
+            print("Deadlock exists: transaction {} is aborted".format(abort_trans_id))
+            self.abort(abort_trans_id)
+            return True
+        return False
         
 def dfs(cur,root,visited,graph):
     visited.add(cur)

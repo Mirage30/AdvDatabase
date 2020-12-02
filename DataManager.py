@@ -305,6 +305,11 @@ class DataManager:
                     return False
                 return True
             return lm.current_lock.trans_id != lock_in_queue.trans_id
+        
+        def queue_blocks(lock_j,lock_i):
+            if lock_j.lock_type == "R" and lock_i.lock_type == "R":
+                 return False
+            return not lock_j.trans_id == lock_i.trans_id
 
         graph = defaultdict(set)
         for var_idx, var in self.variable_table.items():
@@ -318,6 +323,22 @@ class DataManager:
                         for trans_id in cur_lock.share_list:
                             if trans_id != lock_in_queue.trans_id:
                                 graph[lock_in_queue.trans_id].add(trans_id)
+                    else:
+                        if cur_lock.trans_id == lock_in_queue:
+                            continue
+                        else:
+                            graph[lock_in_queue.trans_id].add(
+                                cur_lock.trans_id)
+        
+            for i in range(len(lm.queue)):
+                lock_queue = lm.queue
+                for j in range(i):
+                    if(queue_blocks(lock_queue[j],lock_queue[i])):
+                        graph[lock_queue[i].trans_id].add(lock_queue[j]
+                        .trans_id)
+        return graph
+
+            
 
 
 
