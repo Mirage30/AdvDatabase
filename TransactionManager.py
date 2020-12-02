@@ -1,6 +1,6 @@
 import re
 from DataManager import DataManager
-
+from collections import defaultdict
 
 class Parser:
     done_flag = False
@@ -265,3 +265,11 @@ class TransactionManager:
         dm: DataManager = self.data_manager_list[site_id - 1]
         dm.recover()
 
+    def deadlock_detect(self):
+        lock_graph = defaultdict(set)
+        for data_manager in self.data_manager_list:
+            if data_manager.is_working:
+                graph = data_manager.generate()
+                for node,adj_list in graph.items():
+                    lock_graph[node].update(adj_list)
+        
