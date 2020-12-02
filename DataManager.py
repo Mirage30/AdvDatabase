@@ -92,6 +92,14 @@ class LockManager:
                 self.current_lock = None    
 
 
+    def update_lock_queue(self):
+        """
+        put the front lock of the lock queue to current lock
+        """
+        if not self.current_lock and len(self.lock_queue):
+            self.current_lock = self.lock_queue.pop(0)
+
+
 class CommitValue:
     def __init__(self, value, timestamp):
         """
@@ -259,7 +267,7 @@ class DataManager:
             for lk in list(lm.lock_queue):
                 if lk.trans_id == trans_id:
                     lm.lock_queue.remove(lk)
-            # print("xxxx {}".format(len(lm.lock_queue)))
+            lm.update_lock_queue()
 
 
     def commit(self, trans_id, timestamp):
@@ -278,6 +286,9 @@ class DataManager:
                     # print(self.site_id)
                     # print(var.var_id)
                     raise InvalidInputError("ERROR: transaction {} commits before all operations done".format(trans_id))
+            
+            lm.update_lock_queue()
+            
 
 
     def fail(self):
