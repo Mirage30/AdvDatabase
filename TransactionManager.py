@@ -70,7 +70,7 @@ class TransactionManager:
         """
         args = self.parser.translate(line) # command and args or None
         if args:
-            print("raw line : " + line.strip())
+            print("\nraw line : " + line.strip())
 
             command = args.pop(0)
             if command == "begin":
@@ -197,12 +197,11 @@ class TransactionManager:
             if dm.is_working and not dm.check_write(operation.trans_id, operation.var_id):
                 return False
         
+        sites = []
         for dm in self.data_manager_list:
-            if dm.is_working:
-                dm.write(operation.trans_id, operation.var_id, operation.value)
-                # record the trans_id in case the site fails and the trans_id need to be aborted
-                dm.visited_transaction.add(operation.trans_id)
-        print("Transaction {} write value {} to {}".format(operation.trans_id, operation.value, operation.var_id))
+            if dm.is_working and dm.write(operation.trans_id, operation.var_id, operation.value):
+                sites.append(dm.site_id)                
+        print("Transaction {} write value {} to {} in sites {}".format(operation.trans_id, operation.value, operation.var_id, sites))
         return True
 
 

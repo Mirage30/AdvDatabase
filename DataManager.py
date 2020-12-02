@@ -96,9 +96,19 @@ class LockManager:
         """
         put the front lock of the lock queue to current lock
         """
-        if not self.current_lock and len(self.lock_queue):
+        if not len(self.lock_queue):
+            return
+        if not self.current_lock:
             self.current_lock = self.lock_queue.pop(0)
-
+        elif self.current_lock.lock_type == "R":
+            for lk in list(self.lock_queue):
+                if lk.lock_type == "W" and len(self.current_lock.share_list) == 1 and lk.trans_id in self.current_lock.share_list:
+                    self.promote_current_lock(lk)
+                    self.lock_queue.remove(lk)
+                    break
+                self.share_lock(lk.trans_id)
+                self.lock_queue.remove(lk)
+                
 
 class CommitValue:
     def __init__(self, value, timestamp):
@@ -239,10 +249,14 @@ class DataManager:
         trans_id (str)
         var_id (str)
         value (int)
+        Return (bool): write successful
         """
         if not self.variable_table.get(var_id):
-            return
+            return False
         self.variable_table[var_id].temp_val = value
+        # record the trans_id in case the site fails and the trans_id need to be aborted
+        self.visited_transaction.add(trans_id)
+        return True
 
 
     def dump(self):
