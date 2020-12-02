@@ -295,6 +295,7 @@ class DataManager:
         self.is_working = True
         self.visited_transaction = set()
 
+
     def generate_graph(self):
 
         def cur_blocks(cur_lock, lock_in_queue):
