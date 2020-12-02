@@ -70,7 +70,7 @@ class TransactionManager:
         """
         args = self.parser.translate(line) # command and args or None
         if args:
-            print("\nraw line : " + line.strip())
+            # print("\nraw line : " + line.strip())
 
             command = args.pop(0)
             if command == "begin":
